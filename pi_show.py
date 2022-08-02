@@ -147,12 +147,11 @@ def load_font_h(font_file):
 			#Example: '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf'
 			font_h = ImageFont.truetype(font_file, 9)
 		else:
-			if os.path.exists('/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf'):
-				#Seriously nicer font than the default for this small display.
-				font_h = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf', 9)
-			else:
-				# Load default font.
-				font_h = ImageFont.load_default()
+			font_h = (
+				ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf', 9)
+				if os.path.exists('/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf')
+				else ImageFont.load_default()
+			)
 
 	return font_h
 
@@ -170,8 +169,14 @@ def send_text(display_module_name, disp_h, image_h, draw_h, font_h, text_l, max_
 		# Draw a black filled box to clear the image.
 		draw_h.rectangle((0, 0, disp_h.width, disp_h.height), outline=0, fill=0)
 
-		for line_count in range(0, min(max_lines, len(text_l))):
-			draw_h.text((0, pad_pixels + 8 * line_count), text_l[line_count][0:max_chars], font=font_h, fill=255)
+		for line_count in range(min(max_lines, len(text_l))):
+			draw_h.text(
+				(0, pad_pixels + 8 * line_count),
+				text_l[line_count][:max_chars],
+				font=font_h,
+				fill=255,
+			)
+
 
 		disp_h.image(image_h)
 		disp_h.show()
@@ -197,7 +202,10 @@ def send_image(display_module_name, disp_h, image_file, display_time):
 				disp_h.image(image_h)
 			except ValueError:
 				#Could be that the supplied image has not been converted correctly, so we'll force a conversion
-				warn(image_file + ' is not in ' + str(disp_h.width) + 'x' + str(disp_h.height) + 'x1 format, converting.')
+				warn(
+					f'{image_file} is not in {str(disp_h.width)}x{str(disp_h.height)}x1 format, converting.'
+				)
+
 				image_h = Image.open(image_file).resize((disp_h.width, disp_h.height), Image.ANTIALIAS).convert('1')
 				disp_h.image(image_h)
 			disp_h.show()
@@ -207,7 +215,7 @@ def send_image(display_module_name, disp_h, image_file, display_time):
 			except KeyboardInterrupt:
 				sys.exit(0)
 	else:
-		warn(image_file + " unreadable, skipping.")
+		warn(f"{image_file} unreadable, skipping.")
 
 
 def sorted_dir_list(requested_start_object):
@@ -219,9 +227,11 @@ def sorted_dir_list(requested_start_object):
 	if os.path.isfile(requested_start_object):
 		justfile_list.append(requested_start_object)
 	elif os.path.isdir(requested_start_object):
-		for one_obj in os.listdir(requested_start_object):
-			if os.path.isfile(requested_start_object + '/' + one_obj):
-				justfile_list.append(requested_start_object + '/' + one_obj)
+		justfile_list.extend(
+			f'{requested_start_object}/{one_obj}'
+			for one_obj in os.listdir(requested_start_object)
+			if os.path.isfile(f'{requested_start_object}/{one_obj}')
+		)
 
 	justfile_list.sort()
 
@@ -271,9 +281,26 @@ feh_installed = os.path.exists('/usr/bin/feh') or os.path.exists('/bin/feh') or 
 if __name__ == "__main__":
 	import argparse
 
-	parser = argparse.ArgumentParser(description='pi_show version ' + str(pi_show_version))
-	parser.add_argument('-w', '--wait', help='Time to show a screen before moving to the next (default: ' + str(default_delay) + ' ).', required=False, default=default_delay)
-	parser.add_argument('-d', '--directory', help='Directory that holds text files/images to be shown (default: ' + str(default_show_dir) + ' ).', required=False, default=default_show_dir)
+	parser = argparse.ArgumentParser(
+		description=f'pi_show version {pi_show_version}'
+	)
+
+	parser.add_argument(
+		'-w',
+		'--wait',
+		help=f'Time to show a screen before moving to the next (default: {default_delay} ).',
+		required=False,
+		default=default_delay,
+	)
+
+	parser.add_argument(
+		'-d',
+		'--directory',
+		help=f'Directory that holds text files/images to be shown (default: {default_show_dir} ).',
+		required=False,
+		default=default_show_dir,
+	)
+
 	parser.add_argument('-o', '--once', help='Show each requested object once, then exit (default: continuous loop)', required=False, default=False, action='store_true')
 	parser.add_argument('-s', '--stdin', help='Show text handed on stdin (lines are only read a single time)', required=False, default=False, action='store_true')
 	parser.add_argument('-f', '--font', help='Full path to truetype font file (default: DejaVuSans)', required=False, default=None)
